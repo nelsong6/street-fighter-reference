@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drive Rush Momentum</title>
+<meta name="description" content="How Street Fighter 6 normals carry Drive Rush speed, per character and per normal, from the game files.">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<nav><a href="../../">Street Fighter reference</a> / <a href="../">Street Fighter 6</a> / Drive Rush momentum</nav>
+<h1>Drive Rush momentum</h1>
+<p>A normal's <b>Drive Rush momentum</b> is how that normal moves when it is done out of Drive Rush, on top of its own movement. Two things combine: <b>when</b> you cancel (each character's rush has its own speed curve) and <b>which normal</b> you choose (each normal has its own multiplier, slowdown and stop frame).</p>
+<p class="muted" id="build">Loading data…</p>
+
+<div class="controls">
+  <label>Character <select id="ch"></select></label>
+  <label>Normal <select id="nm"></select></label>
+  <label>Cancel after rush frame <input id="fr" type="range" step="1"> <b id="frv"></b></label>
+</div>
+
+<div class="panel">
+  <div class="muted">1. When you cancel: the rush's speed on each frame (cm per frame). Shaded: frames a normal can come out. Dashed: your cancel frame.</div>
+  <div class="chart"><canvas id="c1" role="img" aria-label="Drive Rush speed per frame for the selected character">Drive Rush speed curve.</canvas></div>
+</div>
+<div class="panel">
+  <div class="muted">2. The normal you choose: the extra speed it carries on each of its own frames. Darker bar: its first active frame.</div>
+  <div class="chart" style="height:210px"><canvas id="c2" role="img" aria-label="Carried speed per frame of the selected normal">Carried speed per frame.</canvas></div>
+  <div class="cards">
+    <div class="card"><div class="k">Rush speed at cancel</div><div class="v" id="s1">-</div></div>
+    <div class="card"><div class="k">Normal's first-frame speed</div><div class="v" id="s2">-</div></div>
+    <div class="card"><div class="k">Extra reach by first active frame</div><div class="v" id="s3">-</div></div>
+    <div class="card"><div class="k">Extra distance in total</div><div class="v" id="s4">-</div></div>
+  </div>
+  <p class="muted" id="fx"></p>
+</div>
+
+<h2>How it works</h2>
+<ul>
+  <li><b>Starting speed</b> = the rush's speed on the frame you cancel × the normal's <b>multiplier</b> (most normals 1.0; Blanka's mostly 0.7).</li>
+  <li>Each frame the normal loses its <b>slowdown</b> (usually 0.5 cm per frame) until the speed reaches 0 or its <b>stop frame</b> cuts it off.</li>
+  <li>A few normals set their <b>own fixed speed</b> and ignore the rush (Alex's 5HP always starts at 8).</li>
+  <li>Specials carry no momentum.</li>
+  <li>While you push the opponent, both of you move at half speed. The slide pauses during hitstop and continues after it.</li>
+  <li>Separately, Drive Rush normals add 4 frames of hitstun and blockstun (a constant in the game's code).</li>
+</ul>
+<p class="muted">Not shown: each normal's own animation movement, and pushing. Normals done from stances appear with their stance input (for example Alex's Prowler Stance follow-ups). Measured in Training on Alex (5MP from two cancel points, 2MK, 5HP, 6MP) and Blanka (5MP at three cancel points); every frame matched.</p>
+</main>
+<script src="../vendor/chart-4.4.1.umd.js"></script>
+<script>
+(async () => {
+  const latest = await (await fetch('../data/latest.json')).json();
+  const data = await (await fetch(`../data/${latest.build}/drive-rush.json`)).json();
+  document.getElementById('build').textContent = `Game build ${data.build}, exported ${data.exported}. All values from the game files.`;
+  const chars = data.characters;
+  const css = getComputedStyle(document.documentElement);
+  const v = n => css.getPropertyValue(n).trim();
+  const C1 = v('--accent'), C2 = v('--accent-2'), C2s = v('--accent-2-strong'), G = v('--grid'), T = v('--muted');
+  const ch = document.getElementById('ch'), nm = document.getElementById('nm'), fr = document.getElementById('fr');
+  ch.innerHTML = Object.keys(chars).map(n => `<option>${n}</option>`).join('');
+  const params = new URLSearchParams(location.search);
+  if (params.get('c') && chars[params.get('c')]) ch.value = params.get('c');
+  function fillNormals() {
+    const c = chars[ch.value];
+    nm.innerHTML = c.normals.map((n, i) => `<option value="${i}">${n.input}${n.name ? ' (' + n.name + ')' : ''}</option>`).join('');
+    fr.min = c.cancel_window[0]; fr.max = c.cancel_window[1];
+    if (+fr.value < +fr.min || +fr.value > +fr.max) fr.value = fr.min;
+  }
+  const mark = { id: 'mark', afterDatasetsDraw(c) {
+    if (c.canvas.id !== 'c1') return;
+    const w = chars[ch.value].cancel_window, x = c.scales.x, a = c.chartArea, ctx = c.ctx;
+    ctx.save(); ctx.fillStyle = G;
+    const x0 = x.getPixelForValue(w[0]), x1 = x.getPixelForValue(w[1]);
+    ctx.fillRect(x0, a.top, x1 - x0, a.bottom - a.top);
+    const xf = x.getPixelForValue(+fr.value);
+    ctx.strokeStyle = C2; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(xf, a.top); ctx.lineTo(xf, a.bottom); ctx.stroke(); ctx.restore();
+  } };
+  const axes = t => ({ x: { title: { display: true, text: t, color: T }, ticks: { color: T }, grid: { display: false } },
+                       y: { beginAtZero: true, ticks: { color: T }, grid: { color: G } } });
+  const c1 = new Chart(document.getElementById('c1'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: C1, borderWidth: 2, pointRadius: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, scales: axes('rush frame'),
+      plugins: { legend: { display: false }, tooltip: { callbacks: { title: i => 'rush frame ' + i[0].label, label: i => i.parsed.y.toFixed(2) + ' cm/frame' } } } }, plugins: [mark] });
+  const c2 = new Chart(document.getElementById('c2'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, scales: axes("normal's frame"),
+      plugins: { legend: { display: false }, tooltip: { callbacks: { title: i => 'normal frame ' + i[0].label, label: i => i.parsed.y.toFixed(2) + ' cm/frame' } } } } });
+  function carried(n, rushSpeed) {
+    let speed = n.fixed_speed !== undefined ? n.fixed_speed : rushSpeed * n.multiplier;
+    const out = [], frames = Math.max((n.stop ?? 30) + 2, n.startup + 2);
+    for (let k = 0; k < frames; k++) {
+      if (n.stop !== null && k >= n.stop) speed = 0;
+      else { const next = speed - n.slowdown; speed = next < 0 ? 0 : next; }
+      out.push(speed);
+    }
+    return out;
+  }
+  function run() {
+    const c = chars[ch.value], n = c.normals[+nm.value], f = +fr.value, rushSpeed = c.rush[f] ?? 0;
+    document.getElementById('frv').textContent = f;
+    c1.data.labels = c.rush.map((_, i) => i); c1.data.datasets[0].data = c.rush; c1.update();
+    const out = carried(n, rushSpeed);
+    c2.data.labels = out.map((_, i) => i + 1); c2.data.datasets[0].data = out.map(x => +x.toFixed(2));
+    c2.data.datasets[0].backgroundColor = out.map((_, i) => i + 1 === n.startup ? C2s : C2); c2.update();
+    const reach = out.slice(0, n.startup).reduce((a, b) => a + b, 0), total = out.reduce((a, b) => a + b, 0);
+    document.getElementById('s1').textContent = rushSpeed.toFixed(2);
+    document.getElementById('s2').textContent = out[0].toFixed(2);
+    document.getElementById('s3').textContent = reach.toFixed(1) + ' cm';
+    document.getElementById('s4').textContent = total.toFixed(1) + ' cm';
+    document.getElementById('fx').textContent = n.fixed_speed !== undefined
+      ? `${n.input} ignores the rush: it sets ${n.fixed_speed} cm/frame, then loses ${n.slowdown} per frame until frame ${n.stop}.`
+      : `First frame = ${rushSpeed.toFixed(2)} × ${n.multiplier} − ${n.slowdown} = ${out[0].toFixed(2)}; then −${n.slowdown} each frame` + (n.stop !== null ? `, cut to 0 at frame ${n.stop}.` : '.');
+    history.replaceState(null, '', `?c=${encodeURIComponent(ch.value)}`);
+  }
+  ch.onchange = () => { fillNormals(); run(); }; nm.onchange = run; fr.oninput = run;
+  fillNormals(); run();
+})();
+</script>
+</body>
+</html>
