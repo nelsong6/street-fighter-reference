@@ -18,20 +18,23 @@
   <label>Character <select id="ch"></select></label>
   <label>Normal <select id="nm"></select></label>
   <label>Cancel after rush frame <input id="fr" type="range" step="1"> <b id="frv"></b></label>
+  <label>Compare with <select id="cmp"></select></label>
 </div>
 
 <div class="panel">
   <div class="muted">1. When you cancel: the rush's speed on each frame (cm per frame). Shaded: frames a normal can come out. Dashed: your cancel frame.</div>
-  <div class="chart"><canvas id="c1" role="img" aria-label="Drive Rush speed per frame for the selected character">Drive Rush speed curve.</canvas></div>
+  <div class="legend" id="lg1"></div>
+  <div class="chart"><canvas id="c1" role="img" aria-label="Drive Rush speed per frame for the selected character and the comparison">Drive Rush speed curve.</canvas></div>
 </div>
 <div class="panel">
   <div class="muted">2. The normal you choose: the extra speed it carries on each of its own frames. Darker bar: its first active frame.</div>
-  <div class="chart" style="height:210px"><canvas id="c2" role="img" aria-label="Carried speed per frame of the selected normal">Carried speed per frame.</canvas></div>
+  <div class="legend" id="lg2"></div>
+  <div class="chart" style="height:210px"><canvas id="c2" role="img" aria-label="Carried speed per frame of the selected normal and the comparison">Carried speed per frame.</canvas></div>
   <div class="cards">
-    <div class="card"><div class="k">Rush speed at cancel</div><div class="v" id="s1">-</div></div>
-    <div class="card"><div class="k">Normal's first-frame speed</div><div class="v" id="s2">-</div></div>
-    <div class="card"><div class="k">Extra reach by first active frame</div><div class="v" id="s3">-</div></div>
-    <div class="card"><div class="k">Extra distance in total</div><div class="v" id="s4">-</div></div>
+    <div class="card"><div class="k">Rush speed at cancel</div><div class="v" id="s1">-</div><div class="d" id="d1"></div></div>
+    <div class="card"><div class="k">Normal's first-frame speed</div><div class="v" id="s2">-</div><div class="d" id="d2"></div></div>
+    <div class="card"><div class="k">Extra reach by first active frame</div><div class="v" id="s3">-</div><div class="d" id="d3"></div></div>
+    <div class="card"><div class="k">Extra distance in total</div><div class="v" id="s4">-</div><div class="d" id="d4"></div></div>
   </div>
   <p class="muted" id="fx"></p>
 </div>
@@ -45,26 +48,38 @@
   <li>While you push the opponent, both of you move at half speed. The slide pauses during hitstop and continues after it.</li>
   <li>Separately, Drive Rush normals add 4 frames of hitstun and blockstun (a constant in the game's code).</li>
 </ul>
-<p class="muted">Not shown: each normal's own animation movement, and pushing. Normals done from stances appear with their stance input (for example Alex's Prowler Stance follow-ups). Measured in Training on Alex (5MP from two cancel points, 2MK, 5HP, 6MP) and Blanka (5MP at three cancel points); every frame matched.</p>
+<p class="muted">The typical Drive Rush is the cast's median rush speed on each frame, with the most common normal settings (multiplier 1.0, slowdown 0.5) and the chosen normal's own stop frame and first active frame. Not shown: each normal's own animation movement, and pushing. Normals done from stances appear with their stance input (for example Alex's Prowler Stance follow-ups). Measured in Training on Alex (5MP from two cancel points, 2MK, 5HP, 6MP) and Blanka (5MP at three cancel points); every frame matched.</p>
 </main>
+<style>
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin: 6px 0 2px; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
+.card .d { font-size: 12px; color: var(--muted); min-height: 16px; }
+</style>
 <script src="../vendor/chart-4.4.1.umd.js"></script>
 <script>
 (async () => {
   const latest = await (await fetch('../data/latest.json')).json();
   const data = await (await fetch(`../data/${latest.build}/drive-rush.json`)).json();
   document.getElementById('build').textContent = `Game build ${data.build}, exported ${data.exported}. All values from the game files.`;
-  const chars = data.characters;
+  const chars = data.characters, typical = data.typical;
   const css = getComputedStyle(document.documentElement);
   const v = n => css.getPropertyValue(n).trim();
   const C1 = v('--accent'), C2 = v('--accent-2'), C2s = v('--accent-2-strong'), G = v('--grid'), T = v('--muted');
-  const ch = document.getElementById('ch'), nm = document.getElementById('nm'), fr = document.getElementById('fr');
+  const CMP = matchMedia('(prefers-color-scheme: dark)').matches ? '#8b8882' : '#9a968e';
+  const ch = document.getElementById('ch'), nm = document.getElementById('nm'), fr = document.getElementById('fr'), cmp = document.getElementById('cmp');
   ch.innerHTML = Object.keys(chars).map(n => `<option>${n}</option>`).join('');
   const params = new URLSearchParams(location.search);
   if (params.get('c') && chars[params.get('c')]) ch.value = params.get('c');
+  const label = n => `${n.input}${n.name ? ' (' + n.name + ')' : ''}`;
   function fillNormals() {
     const c = chars[ch.value];
-    nm.innerHTML = c.normals.map((n, i) => `<option value="${i}">${n.input}${n.name ? ' (' + n.name + ')' : ''}</option>`).join('');
+    nm.innerHTML = c.normals.map((n, i) => `<option value="${i}">${label(n)}</option>`).join('');
     fr.min = c.cancel_window[0]; fr.max = c.cancel_window[1]; fr.value = c.cancel_window[0];
+    const keep = cmp.value || 'typical';
+    cmp.innerHTML = '<option value="none">Nothing</option><option value="typical">Typical Drive Rush</option>' +
+      Object.keys(chars).filter(n => n !== ch.value).map(n => `<option value="${n}">${n} (same input)</option>`).join('');
+    cmp.value = [...cmp.options].some(o => o.value === keep) ? keep : 'typical';
   }
   const mark = { id: 'mark', afterDatasetsDraw(c) {
     if (c.canvas.id !== 'c1') return;
@@ -78,40 +93,82 @@
   } };
   const axes = t => ({ x: { title: { display: true, text: t, color: T }, ticks: { color: T }, grid: { display: false } },
                        y: { beginAtZero: true, ticks: { color: T }, grid: { color: G } } });
-  const c1 = new Chart(document.getElementById('c1'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: C1, borderWidth: 2, pointRadius: 0 }] },
-    options: { responsive: true, maintainAspectRatio: false, animation: false, scales: axes('rush frame'),
-      plugins: { legend: { display: false }, tooltip: { callbacks: { title: i => 'rush frame ' + i[0].label, label: i => i.parsed.y.toFixed(2) + ' cm/frame' } } } }, plugins: [mark] });
-  const c2 = new Chart(document.getElementById('c2'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
-    options: { responsive: true, maintainAspectRatio: false, animation: false, scales: axes("normal's frame"),
-      plugins: { legend: { display: false }, tooltip: { callbacks: { title: i => 'normal frame ' + i[0].label, label: i => i.parsed.y.toFixed(2) + ' cm/frame' } } } } });
-  function carried(n, rushSpeed) {
+  const tip = (unit, prefix) => ({ callbacks: { title: i => prefix + i[0].label, label: i => `${i.dataset.label}: ${i.parsed.y.toFixed(2)} ${unit}` } });
+  const c1 = new Chart(document.getElementById('c1'), { type: 'line',
+    data: { labels: [], datasets: [{ label: '', data: [], borderColor: C1, borderWidth: 2, pointRadius: 0 },
+                                   { label: '', data: [], borderColor: CMP, borderWidth: 2, borderDash: [6, 4], pointRadius: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+      scales: axes('rush frame'), plugins: { legend: { display: false }, tooltip: tip('cm/frame', 'rush frame ') } }, plugins: [mark] });
+  const c2 = new Chart(document.getElementById('c2'), { type: 'bar',
+    data: { labels: [], datasets: [{ label: '', data: [], backgroundColor: [] }, { label: '', data: [], backgroundColor: CMP }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+      scales: axes("normal's frame"), plugins: { legend: { display: false }, tooltip: tip('cm/frame', 'normal frame ') } } });
+  function carried(n, rushSpeed, frames) {
     let speed = n.fixed_speed !== undefined ? n.fixed_speed : rushSpeed * n.multiplier;
-    const out = [], frames = Math.max((n.stop ?? 30) + 2, n.startup + 2);
+    const out = [];
     for (let k = 0; k < frames; k++) {
-      if (n.stop !== null && k >= n.stop) speed = 0;
+      if (n.stop !== null && n.stop !== undefined && k >= n.stop) speed = 0;
       else { const next = speed - n.slowdown; speed = next < 0 ? 0 : next; }
       out.push(speed);
     }
     return out;
   }
+  const sum = (a, k) => a.slice(0, k).reduce((x, y) => x + y, 0);
+  const fmt = x => x.toFixed(1);
+  const diff = (a, b, unit) => { const d = a - b; return `${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(unit ? 1 : 2)}${unit} vs ${b.toFixed(unit ? 1 : 2)}${unit}`; };
+  function comparison(n, f) {
+    if (cmp.value === 'none') return null;
+    if (cmp.value === 'typical') {
+      return { name: 'Typical Drive Rush', rush: typical.rush, speed: typical.rush[f] ?? 0,
+               normal: { multiplier: typical.multiplier, slowdown: typical.slowdown, stop: n.stop, startup: n.startup } };
+    }
+    const other = chars[cmp.value], match = other.normals.find(o => o.input === n.input);
+    return { name: cmp.value, rush: other.rush, speed: other.rush[f] ?? 0, normal: match || null };
+  }
+  function legend(id, items) {
+    document.getElementById(id).innerHTML = items.map(([c, t, dash]) =>
+      `<span><i style="background:${dash ? `repeating-linear-gradient(90deg,${c} 0 5px,transparent 5px 8px)` : c}"></i>${t}</span>`).join('');
+  }
   function run() {
     const c = chars[ch.value], n = c.normals[+nm.value], f = +fr.value, rushSpeed = c.rush[f] ?? 0;
     document.getElementById('frv').textContent = f;
-    c1.data.labels = c.rush.map((_, i) => i); c1.data.datasets[0].data = c.rush; c1.update();
-    const out = carried(n, rushSpeed);
-    c2.data.labels = out.map((_, i) => i + 1); c2.data.datasets[0].data = out.map(x => +x.toFixed(2));
-    c2.data.datasets[0].backgroundColor = out.map((_, i) => i + 1 === n.startup ? C2s : C2); c2.update();
-    const reach = out.slice(0, n.startup).reduce((a, b) => a + b, 0), total = out.reduce((a, b) => a + b, 0);
+    const cm = comparison(n, f);
+    const frames = Math.max((n.stop ?? 30) + 2, n.startup + 2, cm && cm.normal ? Math.max((cm.normal.stop ?? 30) + 2, cm.normal.startup + 2) : 0);
+    const len = Math.max(c.rush.length, cm ? cm.rush.length : 0);
+    c1.data.labels = Array.from({ length: len }, (_, i) => i);
+    c1.data.datasets[0].data = c.rush; c1.data.datasets[0].label = ch.value;
+    c1.data.datasets[1].data = cm ? cm.rush : []; c1.data.datasets[1].label = cm ? cm.name : '';
+    c1.update();
+    const out = carried(n, rushSpeed, frames);
+    const other = cm && cm.normal ? carried(cm.normal, cm.speed, frames) : null;
+    c2.data.labels = out.map((_, i) => i + 1);
+    c2.data.datasets[0].data = out.map(x => +x.toFixed(2)); c2.data.datasets[0].label = `${ch.value} ${n.input}`;
+    c2.data.datasets[0].backgroundColor = out.map((_, i) => i + 1 === n.startup ? C2s : C2);
+    c2.data.datasets[1].data = other ? other.map(x => +x.toFixed(2)) : [];
+    c2.data.datasets[1].label = cm ? (cm.name === 'Typical Drive Rush' ? 'Typical normal' : `${cm.name} ${n.input}`) : '';
+    c2.update();
+    legend('lg1', [[C1, ch.value]].concat(cm ? [[CMP, cm.name, true]] : []));
+    legend('lg2', [[C2, `${ch.value} ${label(n)}`]].concat(other ? [[CMP, c2.data.datasets[1].label]] : cm ? [[CMP, `${cm.name} has no ${n.input}`]] : []));
+    const reach = sum(out, n.startup), total = sum(out, out.length);
     document.getElementById('s1').textContent = rushSpeed.toFixed(2);
     document.getElementById('s2').textContent = out[0].toFixed(2);
-    document.getElementById('s3').textContent = reach.toFixed(1) + ' cm';
-    document.getElementById('s4').textContent = total.toFixed(1) + ' cm';
+    document.getElementById('s3').textContent = fmt(reach) + ' cm';
+    document.getElementById('s4').textContent = fmt(total) + ' cm';
+    if (cm) {
+      document.getElementById('d1').textContent = diff(rushSpeed, cm.speed, '');
+      if (other) {
+        const oReach = sum(other, cm.normal.startup), oTotal = sum(other, other.length);
+        document.getElementById('d2').textContent = diff(out[0], other[0], '');
+        document.getElementById('d3').textContent = diff(reach, oReach, ' cm');
+        document.getElementById('d4').textContent = diff(total, oTotal, ' cm');
+      } else { ['d2', 'd3', 'd4'].forEach(id => document.getElementById(id).textContent = ''); }
+    } else { ['d1', 'd2', 'd3', 'd4'].forEach(id => document.getElementById(id).textContent = ''); }
     document.getElementById('fx').textContent = n.fixed_speed !== undefined
       ? `${n.input} ignores the rush: it sets ${n.fixed_speed} cm/frame, then loses ${n.slowdown} per frame until frame ${n.stop}.`
       : `First frame = ${rushSpeed.toFixed(2)} × ${n.multiplier} − ${n.slowdown} = ${out[0].toFixed(2)}; then −${n.slowdown} each frame` + (n.stop !== null ? `, cut to 0 at frame ${n.stop}.` : '.');
     history.replaceState(null, '', `?c=${encodeURIComponent(ch.value)}`);
   }
-  ch.onchange = () => { fillNormals(); run(); }; nm.onchange = run; fr.oninput = run;
+  ch.onchange = () => { fillNormals(); run(); }; nm.onchange = run; fr.oninput = run; cmp.onchange = run;
   fillNormals(); run();
 })();
 </script>
