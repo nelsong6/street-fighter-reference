@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Juggle Airtime</title>
+<meta name="description" content="How long each Street Fighter 6 launcher keeps the opponent airborne, when the attacker can act, the juggle window, height per frame and drift, from the game files.">
+<link rel="stylesheet" href="../style.css">
+<style>
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin: 6px 0 2px; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; }
+.card .d { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<nav><a href="../../">Street Fighter reference</a> / <a href="../">Street Fighter 6</a> / Juggle airtime</nav>
+<h1>Juggle airtime</h1>
+<p>For every move that launches, on a normal hit, a counter hit and a punish counter: how long the opponent stays airborne, when the attacker can act again, the <b>juggle window</b> between the two, the opponent's height on every frame, and how fast they drift away.</p>
+<p class="muted" id="build">Loading data…</p>
+
+<div class="controls">
+  <label>Attacker <select id="ch"></select></label>
+  <label>Move <select id="mv"></select></label>
+  <label>Situation <select id="st"></select></label>
+  <label>Opponent <select id="df"></select></label>
+</div>
+
+<div class="cards">
+  <div class="card"><div class="k">Opponent airborne</div><div class="v" id="s1">-</div><div class="d">frames after hitstop</div></div>
+  <div class="card"><div class="k">Attacker can act</div><div class="v" id="s2">-</div><div class="d">on airborne frame</div></div>
+  <div class="card"><div class="k">Juggle window</div><div class="v" id="s3">-</div><div class="d" id="s3d">frames to act before they land</div></div>
+  <div class="card"><div class="k">Peak height</div><div class="v" id="s4">-</div><div class="d" id="s4d"></div></div>
+  <div class="card"><div class="k">Drift away</div><div class="v" id="s5">-</div><div class="d" id="s5d"></div></div>
+  <div class="card"><div class="k">Juggle count</div><div class="v" id="s6">-</div><div class="d">a follow-up needs juggle limit ≥ this</div></div>
+</div>
+
+<div class="panel">
+  <div class="muted">The opponent's body in the air on each airborne frame (cm above the ground; their airborne hurtbox, so this differs by opponent). Shaded: frames the attacker can act.</div>
+  <div class="legend"><span><i style="background:var(--accent)"></i>Opponent's body (hurtbox)</span><span><i style="background:var(--grid)"></i>Attacker can act</span></div>
+  <div class="chart" style="height:280px"><canvas id="c1" role="img" aria-label="Opponent's airborne hurtbox height per frame, with the frames the attacker can act shaded">Opponent height per airborne frame.</canvas></div>
+  <p class="muted" id="kind"></p>
+</div>
+
+<h2>How it works</h2>
+<ul>
+  <li>Airtime starts when the opponent's hitstop ends. The launch is a fixed arc read from the hit's reaction data: rising speed and gravity both come from its height and duration, so the same launcher gives the same arc against every character (checked on Ryu, C. Viper and Zangief).</li>
+  <li>The opponent drifts away at a constant speed for the whole time they are airborne (the reaction's distance divided by its duration).</li>
+  <li>They stay hittable the whole time they are in the air: the falling reactions keep a body hurtbox until the knockdown.</li>
+  <li><b>Juggle count</b>: a launcher sets it; a follow-up only connects if its own juggle limit is at least the current count, and then adds to it.</li>
+  <li>A juggle window of 0 or less means the opponent lands before the attacker can act.</li>
+  <li>Whether a particular follow-up reaches also depends on its hitbox and travel; this page gives the timing, height, distance and juggle count to check it against.</li>
+</ul>
+<p class="muted">Confirmed in Training: Ryu's H Hashogeki (normal hit: airborne 41, Ryu can act on frame 21, peak 105.3 cm, drift 3.42 cm per frame, every frame's height exact), L Hashogeki on counter hit and punish counter (exact). One open difference: a hit that lands on an already airborne opponent (Yasmine's H Lipad ng Agila) measured one frame longer than computed.</p>
+</main>
+<script src="../vendor/chart-4.4.1.umd.js"></script>
+<script>
+(async () => {
+  const latest = await (await fetch('../data/latest.json')).json();
+  const base = `../data/${latest.build}/juggles/`;
+  const index = await (await fetch(base + 'index.json')).json();
+  document.getElementById('build').textContent = `Game build ${index.build}, exported ${latest.exported}. All values from the game files.`;
+  const names = Object.keys(index.characters);
+  const withMoves = names.filter(n => index.characters[n].moves > 0);
+  const css = getComputedStyle(document.documentElement), v = n => css.getPropertyValue(n).trim();
+  const A = v('--accent'), G = v('--grid'), T = v('--muted');
+  const ch = document.getElementById('ch'), mv = document.getElementById('mv'), st = document.getElementById('st'), df = document.getElementById('df');
+  ch.innerHTML = withMoves.map(n => `<option>${n}</option>`).join('');
+  df.innerHTML = names.map(n => `<option>${n}</option>`).join('');
+  const params = new URLSearchParams(location.search);
+  if (params.get('c') && withMoves.includes(params.get('c'))) ch.value = params.get('c');
+  df.value = params.get('o') && names.includes(params.get('o')) ? params.get('o') : 'Ryu';
+  const cache = {};
+  let moves = [];
+  const SIT = { normal: 'Normal hit', counter: 'Counter hit', punish: 'Punish counter' };
+  async function loadCharacter() {
+    if (!cache[ch.value]) cache[ch.value] = (await (await fetch(base + encodeURIComponent(ch.value) + '.json')).json()).moves;
+    moves = cache[ch.value];
+    const seen = {};
+    mv.innerHTML = moves.map((m, i) => {
+      const key = m.input + '|' + (m.name || '');
+      seen[key] = (seen[key] || 0) + 1;
+      const total = moves.filter(x => x.input + '|' + (x.name || '') === key).length;
+      return `<option value="${i}">${m.input}${m.name ? ' ' + m.name : ''}${total > 1 ? ' (version ' + seen[key] + ')' : ''}</option>`;
+    }).join('');
+    const wanted = params.get('m');
+    if (wanted) { const i = moves.findIndex(m => m.input === wanted); if (i >= 0) mv.value = i; }
+    fillSituations();
+  }
+  function fillSituations() {
+    const m = moves[+mv.value], keep = st.value;
+    st.innerHTML = Object.keys(SIT).filter(s => m.rows[s]).map(s => `<option value="${s}">${SIT[s]}</option>`).join('');
+    if ([...st.options].some(o => o.value === keep)) st.value = keep;
+  }
+  const current = () => { const m = moves[+mv.value]; return m && m.rows[st.value]; };
+  const box = () => index.characters[df.value].air_hurtbox || { y0: 0, y1: 0 };
+  const shade = { id: 'shade', beforeDatasetsDraw(c) {
+    const r = current(); if (!r) return;
+    const x = c.scales.x, a = c.chartArea, ctx = c.ctx;
+    const from = r.attacker_free + 1, to = r.airborne;
+    if (to < from) return;
+    ctx.save(); ctx.fillStyle = G;
+    const x0 = x.getPixelForValue(from) - (x.getPixelForValue(1) - x.getPixelForValue(0)) / 2;
+    const x1 = x.getPixelForValue(to) + (x.getPixelForValue(1) - x.getPixelForValue(0)) / 2;
+    ctx.fillRect(x0, a.top, x1 - x0, a.bottom - a.top); ctx.restore();
+  } };
+  const chart = new Chart(document.getElementById('c1'), { type: 'bar',
+    data: { labels: [], datasets: [{ label: "Opponent's body", data: [], backgroundColor: A, borderRadius: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false,
+      scales: { x: { title: { display: true, text: 'airborne frame', color: T }, ticks: { color: T }, grid: { display: false } },
+                y: { title: { display: true, text: 'cm above the ground', color: T }, ticks: { color: T }, grid: { color: G } } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { title: i => 'airborne frame ' + i[0].label,
+        label: i => { const [lo, hi] = i.raw; return `body ${lo.toFixed(0)} to ${hi.toFixed(0)} cm (origin ${(lo - box().y0).toFixed(1)} cm)`; } } } } },
+    plugins: [shade] });
+  function run() {
+    const r = current(); if (!r) return;
+    const b = box();
+    const heights = r.heights.length ? r.heights : Array(r.airborne).fill(0);
+    chart.data.labels = heights.map((_, i) => i + 1);
+    chart.data.datasets[0].data = heights.map(h => [h + b.y0, h + b.y1]);
+    chart.update();
+    document.getElementById('s1').textContent = r.airborne;
+    document.getElementById('s2').textContent = r.attacker_free + 1;
+    document.getElementById('s3').textContent = r.window;
+    document.getElementById('s3d').textContent = r.window > 0 ? 'frames to act before they land' : 'they land before the attacker can act';
+    const peak = heights.length ? Math.max(...heights) : 0;
+    document.getElementById('s4').textContent = peak.toFixed(1) + ' cm';
+    document.getElementById('s4d').textContent = heights.length ? `on airborne frame ${heights.indexOf(peak) + 1}` : '';
+    document.getElementById('s5').textContent = (r.drift || 0).toFixed(2) + ' cm';
+    document.getElementById('s5d').textContent = `per frame, ${((r.drift || 0) * r.airborne).toFixed(0)} cm in total`;
+    document.getElementById('s6').textContent = r.juggle_count ?? '-';
+    document.getElementById('kind').textContent = `Knockdown type: ${r.kind}. Heights are the opponent's origin plus ${df.value}'s airborne hurtbox (${b.y0} to ${b.y1} cm above the origin).`;
+    const q = new URLSearchParams({ c: ch.value, m: moves[+mv.value].input, o: df.value });
+    history.replaceState(null, '', '?' + q);
+  }
+  ch.onchange = async () => { await loadCharacter(); run(); };
+  mv.onchange = () => { fillSituations(); run(); };
+  st.onchange = run; df.onchange = run;
+  await loadCharacter(); run();
+})();
+</script>
+</body>
+</html>
