@@ -84,9 +84,11 @@
       const total = moves.filter(x => x.input + '|' + (x.name || '') === key).length;
       return `<option value="${i}">${m.input}${m.name ? ' ' + m.name : ''}${total > 1 ? ' (version ' + seen[key] + ')' : ''}</option>`;
     }).join('');
-    const wanted = params.get('m');
-    if (wanted) { const i = moves.findIndex(m => m.input === wanted); if (i >= 0) mv.value = i; }
+    const byAction = moves.findIndex(m => String(m.action) === params.get('a'));
+    const byInput = moves.findIndex(m => m.input === params.get('m'));
+    if (byAction >= 0) mv.value = byAction; else if (byInput >= 0) mv.value = byInput;
     fillSituations();
+    if (params.get('s') && [...st.options].some(o => o.value === params.get('s'))) st.value = params.get('s');
   }
   function fillSituations() {
     const m = moves[+mv.value], keep = st.value;
@@ -131,10 +133,10 @@
     document.getElementById('s5d').textContent = `per frame, ${((r.drift || 0) * r.airborne).toFixed(0)} cm in total`;
     document.getElementById('s6').textContent = r.juggle_count ?? '-';
     document.getElementById('kind').textContent = `Knockdown type: ${r.kind}. Heights are the opponent's origin plus ${df.value}'s airborne hurtbox (${b.y0} to ${b.y1} cm above the origin).`;
-    const q = new URLSearchParams({ c: ch.value, m: moves[+mv.value].input, o: df.value });
+    const q = new URLSearchParams({ c: ch.value, m: moves[+mv.value].input, a: moves[+mv.value].action, s: st.value, o: df.value });
     history.replaceState(null, '', '?' + q);
   }
-  ch.onchange = async () => { await loadCharacter(); run(); };
+  ch.onchange = async () => { ['a', 'm', 's'].forEach(k => params.delete(k)); await loadCharacter(); run(); };
   mv.onchange = () => { fillSituations(); run(); };
   st.onchange = run; df.onchange = run;
   await loadCharacter(); run();

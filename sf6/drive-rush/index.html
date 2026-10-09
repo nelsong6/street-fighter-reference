@@ -11,29 +11,43 @@
 <main>
 <nav><a href="../../">Street Fighter reference</a> / <a href="../">Street Fighter 6</a> / Drive Rush momentum</nav>
 <h1>Drive Rush momentum</h1>
-<p>A normal's <b>Drive Rush momentum</b> is how that normal moves when it is done out of Drive Rush, on top of its own movement. Two things combine: <b>when</b> you cancel (each character's rush has its own speed curve) and <b>which normal</b> you choose (each normal has its own multiplier, slowdown and stop frame).</p>
+<p>A normal's <b>Drive Rush momentum</b> is how that normal moves when it is done out of Drive Rush, on top of its own movement. It comes from two separate things:</p>
+<ol>
+  <li><b>The character's Drive Rush speed.</b> Each character has one rush speed curve, the same for all of their normals. The speed you carry in depends only on the character and the frame you cancel on.</li>
+  <li><b>The normal's own settings.</b> Each normal has a <b>multiplier</b> (how much of the rush speed it keeps), a <b>slowdown</b> (how much speed it loses each frame) and a <b>stop frame</b> (where the slide is cut off). A few normals ignore the rush and set their own speed.</li>
+</ol>
 <p class="muted" id="build">Loading data…</p>
 
 <div class="controls">
   <label>Character <select id="ch"></select></label>
   <label>Normal <select id="nm"></select></label>
-  <label>Cancel after rush frame <input id="fr" type="range" step="1"> <b id="frv"></b></label>
+  <label>Cancel point <input id="fr" type="range" step="1"> <b id="frv"></b></label>
   <label>Compare with <select id="cmp"></select></label>
 </div>
 
+<h2 id="h1">1. The character's Drive Rush speed</h2>
 <div class="panel">
-  <div class="muted">1. When you cancel: the rush's speed on each frame (cm per frame). Shaded: frames a normal can come out. Dashed: your cancel frame.</div>
+  <div class="muted">Speed on each frame of the rush (cm per frame), the same for every normal this character does out of it. Frames are counted on the rush's own clock, which includes the screen freeze. Dashed: your cancel point.</div>
+  <div class="legend"><span><i class="band" style="background:var(--freeze)"></i>Screen freeze (can't act)</span><span><i class="band" style="background:var(--move)"></i>Moving, can't act yet</span><span><i class="band" style="background:var(--window)"></i>Can cancel into an attack (normal, special or super)</span><span><i style="width:14px;height:0;border-top:2px dotted var(--muted)"></i>From here a held direction stops the rush</span></div>
   <div class="legend" id="lg1"></div>
   <div class="chart"><canvas id="c1" role="img" aria-label="Drive Rush speed per frame for the selected character and the comparison">Drive Rush speed curve.</canvas></div>
 </div>
+<h2 id="h2">2. The normal's own settings</h2>
+<div class="cards">
+  <div class="card"><div class="k">Multiplier</div><div class="v" id="n1">-</div><div class="d" id="e1"></div></div>
+  <div class="card"><div class="k">Slowdown per frame</div><div class="v" id="n2">-</div><div class="d" id="e2"></div></div>
+  <div class="card"><div class="k">Cut-off frame</div><div class="v" id="n3">-</div><div class="d" id="e3"></div></div>
+  <div class="card"><div class="k">Startup</div><div class="v" id="n4">-</div><div class="d" id="e4"></div></div>
+</div>
+<h2>Result: the slide</h2>
 <div class="panel">
-  <div class="muted">2. The normal you choose: the extra speed it carries on each of its own frames. Darker bar: its first active frame.</div>
+  <div class="muted">The extra speed the normal carries on each of its own frames: the rush speed at your cancel frame run through the normal's settings. Darker bar: its startup frame. Extra distance by startup adds up the bars to that frame: how much further Drive Rush has carried you when the hitbox comes out.</div>
   <div class="legend" id="lg2"></div>
   <div class="chart" style="height:210px"><canvas id="c2" role="img" aria-label="Carried speed per frame of the selected normal and the comparison">Carried speed per frame.</canvas></div>
   <div class="cards">
     <div class="card"><div class="k">Rush speed at cancel</div><div class="v" id="s1">-</div><div class="d" id="d1"></div></div>
     <div class="card"><div class="k">Normal's first-frame speed</div><div class="v" id="s2">-</div><div class="d" id="d2"></div></div>
-    <div class="card"><div class="k">Extra reach by first active frame</div><div class="v" id="s3">-</div><div class="d" id="d3"></div></div>
+    <div class="card"><div class="k">Extra distance by startup</div><div class="v" id="s3">-</div><div class="d" id="d3"></div></div>
     <div class="card"><div class="k">Extra distance in total</div><div class="v" id="s4">-</div><div class="d" id="d4"></div></div>
   </div>
   <p class="muted" id="fx"></p>
@@ -48,13 +62,20 @@
   <li>While you push the opponent, both of you move at half speed. The slide pauses during hitstop and continues after it.</li>
   <li>Separately, Drive Rush normals add 4 frames of hitstun and blockstun (a constant in the game's code).</li>
 </ul>
-<p class="muted">The typical Drive Rush is the cast's median rush speed on each frame, with the most common normal settings (multiplier 1.0, slowdown 0.5) and the chosen normal's own stop frame and first active frame. Not shown: each normal's own animation movement, and pushing. Normals done from stances appear with their stance input (for example Alex's Prowler Stance follow-ups). Measured in Training on Alex (5MP from two cancel points, 2MK, 5HP, 6MP) and Blanka (5MP at three cancel points); every frame matched.</p>
+<h2>Timing</h2>
+<p>Every character's rush runs on the same clock: a screen freeze of 11 frames out of a parry (10 when Drive Rush is cancelled out of a normal), then 7 more rush frames before you can cancel it into an attack (any normal, special or super), on rush frame 18 at the earliest and until rush frame 55. The speeds before that point only move you; they are never carried into anything. Only normals carry the speed further; specials and supers start without it.</p>
+<p>Moving is different: you cannot jump, crouch, walk or block out of the rush before rush frame 31. From rush frame 31, holding any direction (forward included) stops the rush in 2 frames and you move that way. With no direction held the rush runs to rush frame 55, and if you are still holding the parry buttons it turns into a Drive Parry there (Ryu, measured in Training: up, down, back and forward each stopped the rush after rush frame 30; nothing held ran to 55; parry held went into Drive Parry at 55).</p>
+<p>So for a late cancel, keep the stick neutral and press the attack when you want it; the parry buttons can stay held or not. A direction pressed together with the attack's button is fine: 2MK and 6MP pressed on rush frame 33 came out as normal, and so did 5HP with MP+MK still held, and 5MP after letting go of MP for one frame and pressing it again.</p>
+<p>Worked example, the fastest Drive Rush jab (Ryu, measured in Training): 3 frames of parry while 66 is input, the 11-frame freeze (not counted), 7 rush frames, then the jab's 4 frames of startup: <b>14 frames</b> from the parry press to the jab's first active frame, 25 on screen including the freeze.</p>
+<p class="muted">The typical Drive Rush is the cast's median rush speed on each frame, with the most common normal settings (multiplier 1.0, slowdown 0.5) and the chosen normal's own stop frame and first active frame. Extra distance is on top of the normal's own movement and is not the same as extra range: whether it reaches further also depends on the hitbox. Not shown: each normal's own animation movement, and pushing. Normals done from stances appear with their stance input (for example Alex's Prowler Stance follow-ups). Measured in Training on Alex (5MP from two cancel points, 2MK, 5HP, 6MP) and Blanka (5MP at three cancel points); every frame matched.</p>
 </main>
 <style>
 .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin: 6px 0 2px; }
 .legend span { display: inline-flex; align-items: center; gap: 5px; }
 .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
 .card .d { font-size: 12px; color: var(--muted); min-height: 16px; }
+:root { --freeze: rgba(140,140,140,.45); --move: rgba(140,140,140,.18); --window: rgba(42,120,214,.16); }
+.legend i.band { width: 12px; height: 12px; border: 1px solid var(--line); }
 </style>
 <script src="../vendor/chart-4.4.1.umd.js"></script>
 <script>
@@ -83,11 +104,17 @@
   }
   const mark = { id: 'mark', afterDatasetsDraw(c) {
     if (c.canvas.id !== 'c1') return;
-    const w = chars[ch.value].cancel_window, x = c.scales.x, a = c.chartArea, ctx = c.ctx;
-    ctx.save(); ctx.fillStyle = G;
-    const x0 = x.getPixelForValue(w[0]), x1 = x.getPixelForValue(w[1]);
-    ctx.fillRect(x0, a.top, x1 - x0, a.bottom - a.top);
-    const xf = x.getPixelForValue(+fr.value);
+    const ci = chars[ch.value], w = ci.cancel_window, fz = ci.freeze ? ci.freeze.parry : 0, x = c.scales.x, a = c.chartArea, ctx = c.ctx;
+    const half = (x.getPixelForValue(1) - x.getPixelForValue(0)) / 2;
+    const band = (from, to, color) => { const x0 = x.getPixelForValue(from) - half, x1 = x.getPixelForValue(to) + half; ctx.fillStyle = color; ctx.fillRect(x0, a.top, x1 - x0, a.bottom - a.top); };
+    ctx.save();
+    if (fz) band(0, fz - 1, v('--freeze'));
+    band(fz, w[0], v('--move'));
+    band(w[0] + 1, w[1] + 1, v('--window'));
+    const xs = x.getPixelForValue(31);
+    ctx.strokeStyle = T; ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(xs, a.top); ctx.lineTo(xs, a.bottom); ctx.stroke();
+    const xf = x.getPixelForValue(+fr.value + 1);
     ctx.strokeStyle = C2; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
     ctx.beginPath(); ctx.moveTo(xf, a.top); ctx.lineTo(xf, a.bottom); ctx.stroke(); ctx.restore();
   } };
@@ -131,7 +158,8 @@
   }
   function run() {
     const c = chars[ch.value], n = c.normals[+nm.value], f = +fr.value, rushSpeed = c.rush[f] ?? 0;
-    document.getElementById('frv').textContent = f;
+    const fz = c.freeze ? c.freeze.parry : 0;
+    document.getElementById('frv').textContent = `attack comes out on rush frame ${f + 1}, ${f + 1 - fz} frames after the freeze (rush out of a parry)`;
     const cm = comparison(n, f);
     const frames = Math.max((n.stop ?? 30) + 2, n.startup + 2, cm && cm.normal ? Math.max((cm.normal.stop ?? 30) + 2, cm.normal.startup + 2) : 0);
     const len = Math.max(c.rush.length, cm ? cm.rush.length : 0);
@@ -149,6 +177,28 @@
     c2.update();
     legend('lg1', [[C1, ch.value]].concat(cm ? [[CMP, cm.name, true]] : []));
     legend('lg2', [[C2, `${ch.value} ${label(n)}`]].concat(other ? [[CMP, c2.data.datasets[1].label]] : cm ? [[CMP, `${cm.name} has no ${n.input}`]] : []));
+    document.getElementById('h1').textContent = `1. ${ch.value}'s Drive Rush speed`;
+    document.getElementById('h2').textContent = `2. ${label(n)}'s own settings`;
+    const fixed = n.fixed_speed !== undefined;
+    document.getElementById('n1').textContent = fixed ? 'none' : '× ' + n.multiplier;
+    document.getElementById('e1').textContent = fixed ? `ignores the rush, sets ${n.fixed_speed}` : 'of the rush speed';
+    document.getElementById('n2').textContent = n.slowdown;
+    document.getElementById('e2').textContent = 'cm per frame';
+    document.getElementById('n3').textContent = n.stop != null ? n.stop : 'None';
+    document.getElementById('e3').textContent = n.stop != null
+      ? `the slide is cut to 0 after the normal's frame ${n.stop}, unless its speed has already run out`
+      : `this normal has no cut-off frame: it slides until its speed runs out (−${n.slowdown} per frame)`;
+    document.getElementById('n4').textContent = n.startup;
+    document.getElementById('e4').textContent = `the normal's usual startup (Drive Rush does not change it)`;
+    const tn = cm && cm.normal ? cm.normal : null;
+    if (tn && cm.name === 'Typical Drive Rush') {
+      document.getElementById('e1').textContent += `; typical × ${tn.multiplier}`;
+      document.getElementById('e2').textContent += `; typical ${tn.slowdown}`;
+    } else if (tn && !fixed) {
+      document.getElementById('e1').textContent += tn.fixed_speed !== undefined ? `; ${cm.name}: own speed` : `; ${cm.name} × ${tn.multiplier}`;
+      document.getElementById('e2').textContent += `; ${cm.name} ${tn.slowdown}`;
+
+    }
     const reach = sum(out, n.startup), total = sum(out, out.length);
     document.getElementById('s1').textContent = rushSpeed.toFixed(2);
     document.getElementById('s2').textContent = out[0].toFixed(2);
@@ -166,10 +216,16 @@
     document.getElementById('fx').textContent = n.fixed_speed !== undefined
       ? `${n.input} ignores the rush: it sets ${n.fixed_speed} cm/frame, then loses ${n.slowdown} per frame until frame ${n.stop}.`
       : `First frame = ${rushSpeed.toFixed(2)} × ${n.multiplier} − ${n.slowdown} = ${out[0].toFixed(2)}; then −${n.slowdown} each frame` + (n.stop !== null ? `, cut to 0 at frame ${n.stop}.` : '.');
-    history.replaceState(null, '', `?c=${encodeURIComponent(ch.value)}`);
+    history.replaceState(null, '', '?' + new URLSearchParams({ c: ch.value, n: n.action, f: f + 1, cmp: cmp.value }));
   }
   ch.onchange = () => { fillNormals(); run(); }; nm.onchange = run; fr.oninput = run; cmp.onchange = run;
-  fillNormals(); run();
+  fillNormals();
+  // Restore the normal, cancel point and comparison from the link.
+  const want = chars[ch.value].normals.findIndex(n => String(n.action) === params.get('n'));
+  if (want >= 0) nm.value = want;
+  if (params.get('f')) { const f = +params.get('f') - 1; if (f >= +fr.min && f <= +fr.max) fr.value = f; }
+  if (params.get('cmp') && [...cmp.options].some(o => o.value === params.get('cmp'))) cmp.value = params.get('cmp');
+  run();
 })();
 </script>
 </body>
