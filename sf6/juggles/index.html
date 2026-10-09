@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Juggle Airtime</title>
-<meta name="description" content="How long each Street Fighter 6 launcher keeps the opponent airborne, when the attacker can act, the juggle window, height per frame and drift, from the game files.">
+<title>Juggle Frame Advantage</title>
+<meta name="description" content="Juggle frame advantage for every Street Fighter 6 launcher: how long the opponent stays airborne, when the attacker can act, height per frame and drift, from the game files.">
 <link rel="stylesheet" href="../style.css">
 <style>
 .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin: 6px 0 2px; }
@@ -15,9 +15,9 @@
 </head>
 <body>
 <main>
-<nav><a href="../../">Street Fighter reference</a> / <a href="../">Street Fighter 6</a> / Juggle airtime</nav>
-<h1>Juggle airtime</h1>
-<p>For every move that launches, on a normal hit, a counter hit and a punish counter: how long the opponent stays airborne, when the attacker can act again, the <b>juggle window</b> between the two, the opponent's height on every frame, and how fast they drift away.</p>
+<nav><a href="../../">Street Fighter reference</a> / <a href="../">Street Fighter 6</a> / Juggle frame advantage</nav>
+<h1>Juggle frame advantage</h1>
+<p><b>Juggle frame advantage</b> is frame advantage against an opponent who is still in the air: how many frames you can act before a launched opponent lands. For every move that launches, on a normal hit, a counter hit and a punish counter, this page gives it along with how long the opponent stays airborne, when you can act, their height on every frame, and how fast they drift away.</p>
 <p class="muted" id="build">Loading data…</p>
 
 <div class="controls">
@@ -30,7 +30,7 @@
 <div class="cards">
   <div class="card"><div class="k">Opponent airborne</div><div class="v" id="s1">-</div><div class="d">frames after hitstop</div></div>
   <div class="card"><div class="k">Attacker can act</div><div class="v" id="s2">-</div><div class="d">on airborne frame</div></div>
-  <div class="card"><div class="k">Juggle window</div><div class="v" id="s3">-</div><div class="d" id="s3d">frames to act before they land</div></div>
+  <div class="card"><div class="k">Juggle frame advantage</div><div class="v" id="s3">-</div><div class="d" id="s3d">frames to act before they land</div></div>
   <div class="card"><div class="k">Peak height</div><div class="v" id="s4">-</div><div class="d" id="s4d"></div></div>
   <div class="card"><div class="k">Drift away</div><div class="v" id="s5">-</div><div class="d" id="s5d"></div></div>
   <div class="card"><div class="k">Juggle count</div><div class="v" id="s6">-</div><div class="d">a follow-up needs juggle limit ≥ this</div></div>
@@ -49,7 +49,7 @@
   <li>The opponent drifts away at a constant speed for the whole time they are airborne (the reaction's distance divided by its duration).</li>
   <li>They stay hittable the whole time they are in the air: the falling reactions keep a body hurtbox until the knockdown.</li>
   <li><b>Juggle count</b>: a launcher sets it; a follow-up only connects if its own juggle limit is at least the current count, and then adds to it.</li>
-  <li>A juggle window of 0 or less means the opponent lands before the attacker can act.</li>
+  <li>Juggle frame advantage of 0 or less means the opponent lands before the attacker can act.</li>
   <li>Whether a particular follow-up reaches also depends on its hitbox and travel; this page gives the timing, height, distance and juggle count to check it against.</li>
 </ul>
 <p class="muted">Confirmed in Training: Ryu's H Hashogeki (normal hit: airborne 41, Ryu can act on frame 21, peak 105.3 cm, drift 3.42 cm per frame, every frame's height exact), L Hashogeki on counter hit and punish counter (exact). One open difference: a hit that lands on an already airborne opponent (Yasmine's H Lipad ng Agila) measured one frame longer than computed.</p>
