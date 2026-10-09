@@ -64,8 +64,7 @@
   function fillNormals() {
     const c = chars[ch.value];
     nm.innerHTML = c.normals.map((n, i) => `<option value="${i}">${n.input}${n.name ? ' (' + n.name + ')' : ''}</option>`).join('');
-    fr.min = c.cancel_window[0]; fr.max = c.cancel_window[1];
-    if (+fr.value < +fr.min || +fr.value > +fr.max) fr.value = fr.min;
+    fr.min = c.cancel_window[0]; fr.max = c.cancel_window[1]; fr.value = c.cancel_window[0];
   }
   const mark = { id: 'mark', afterDatasetsDraw(c) {
     if (c.canvas.id !== 'c1') return;
