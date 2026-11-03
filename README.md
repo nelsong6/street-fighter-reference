@@ -3,6 +3,11 @@
 Static reference pages for Street Fighter games, published with GitHub Pages at
 https://nelsong6.github.io/street-fighter-reference/.
 
+Development and CI live at
+https://forgejo.romaine.life/nelsong6/street-fighter-reference; GitHub remains the
+Pages publisher. CI validates the static pages and exported data and verifies the
+GitHub Pages workflow on the same commit.
+
 Each game has its own folder (`sf6/`, later `sf7/` and so on) with its own pages,
 data and vendored libraries. Adding a game never changes another game's folder,
 so old links keep working.

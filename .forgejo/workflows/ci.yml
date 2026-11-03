@@ -1,0 +1,104 @@
+name: Site CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v4
+      - name: Validate pages, scripts and game data
+        run: |
+          python3 - <<'PY'
+          import json
+          import subprocess
+          import tempfile
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import unquote, urlsplit
+
+          root = Path.cwd()
+          class Page(HTMLParser):
+              def __init__(self, source):
+                  super().__init__()
+                  self.source, self.script, self.inline = source, False, []
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  for attr in ('src', 'href'):
+                      value = attrs.get(attr)
+                      if not value:
+                          continue
+                      url = urlsplit(value)
+                      if url.scheme or url.netloc or not url.path:
+                          continue
+                      target = (self.source.parent / unquote(url.path)).resolve()
+                      assert target.is_relative_to(root), (self.source, value)
+                      if target.is_dir():
+                          target /= 'index.html'
+                      assert target.is_file(), (self.source, value)
+                  if tag == 'script' and 'src' not in attrs:
+                      self.script, self.inline = True, []
+              def handle_data(self, data):
+                  if self.script:
+                      self.inline.append(data)
+              def handle_endtag(self, tag):
+                  if tag == 'script' and self.script:
+                      with tempfile.NamedTemporaryFile(suffix='.js', mode='w') as script:
+                          script.write(''.join(self.inline))
+                          script.flush()
+                          subprocess.run(['node', '--check', script.name], check=True)
+                      self.script = False
+
+          pages = [root / 'index.html', *root.glob('sf6/**/index.html')]
+          assert len(pages) >= 4
+          assert (root / '.nojekyll').is_file()
+          for page in pages:
+              Page(page).feed(page.read_text())
+          documents = {p: json.loads(p.read_text()) for p in root.glob('sf6/data/**/*.json')}
+          latest = documents[root / 'sf6/data/latest.json']
+          build = root / 'sf6/data' / latest['build']
+          assert documents[build / 'drive-rush.json']['build'] == latest['build']
+          index = documents[build / 'juggles/index.json']
+          assert index['build'] == latest['build']
+          assert index['characters']
+          for character, metadata in index['characters'].items():
+              data = documents[build / 'juggles' / (character + '.json')]
+              assert data['character'] == character
+              assert len(data['moves']) == metadata['moves'], character
+          print(f'Validated {len(pages)} pages and {len(documents)} data files')
+          PY
+
+  pages:
+    needs: site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify the GitHub Pages run at the same commit
+        env:
+          GH_TOKEN: ${{ secrets.GH_MIRROR_TOKEN }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          api="https://api.github.com/repos/nelsong6/street-fighter-reference/actions/workflows/pages.yml/runs?event=push&head_sha=$SHA&per_page=10"
+          start=$(date +%s)
+          while :; do
+            result=$(curl -fsS --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "$api")
+            count=$(jq '.total_count' <<<"$result")
+            if [ "$count" -gt 0 ]; then
+              status=$(jq -r '.workflow_runs[0].status' <<<"$result")
+              conclusion=$(jq -r '.workflow_runs[0].conclusion' <<<"$result")
+              url=$(jq -r '.workflow_runs[0].html_url' <<<"$result")
+              echo "Pages run $url: $status $conclusion"
+              if [ "$status" = completed ]; then
+                [ "$conclusion" = success ] && exit 0
+                echo "::error::GitHub Pages failed at $SHA: $url"
+                exit 1
+              fi
+            fi
+            if [ "$(( $(date +%s) - start ))" -ge 900 ]; then
+              echo "::error::No successful GitHub Pages push run at $SHA after 15 minutes"
+              exit 1
+            fi
+            sleep 20
+          done

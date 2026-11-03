@@ -1,0 +1,40 @@
+name: GitHub Pages
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package the static site
+        run: |
+          mkdir _site
+          cp .nojekyll index.html _site/
+          cp -R sf6 _site/
+          test -s _site/sf6/data/latest.json
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    if: github.ref == 'refs/heads/main' || (vars.PAGES_BOOTSTRAP_BRANCH != '' && github.ref_name == vars.PAGES_BOOTSTRAP_BRANCH)
+    needs: package
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
