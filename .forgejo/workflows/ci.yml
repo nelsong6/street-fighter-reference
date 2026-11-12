@@ -9,7 +9,8 @@ jobs:
   site:
     runs-on: ubuntu-latest
     steps:
-      - uses: https://github.com/actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: romaine-life/pipeline-templates/actions/check-fetches@main
       - name: Validate pages, scripts and game data
         run: |
           python3 - <<'PY'
@@ -80,7 +81,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_MIRROR_TOKEN }}
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          api="https://api.github.com/repos/nelsong6/street-fighter-reference/actions/workflows/pages.yml/runs?event=push&head_sha=$SHA&per_page=10"
+          api="https://api.github.com/repos/nelsong6/street-fighter-reference/actions/workflows/pages.yml/runs?event=push&head_sha=$SHA&per_page=10" # internet: Verify GitHub Pages deployment
           start=$(date +%s)
           while :; do
             result=$(curl -fsS --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "$api")
