@@ -1,12 +1,17 @@
-name: Site CI
+name: CI
 
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  site:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -73,7 +78,7 @@ jobs:
           PY
 
   pages:
-    needs: site
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - name: Verify the GitHub Pages run at the same commit
