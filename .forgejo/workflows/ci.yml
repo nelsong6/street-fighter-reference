@@ -1,10 +1,12 @@
 name: CI
 
+# Checks the site on its pull request. GitHub Pages publishes main from GitHub's mirror;
+# no Forgejo job waits on it (PIPT-12: no job holds a runner while it waits).
 on:
   pull_request:
-  push:
-    branches: [main]
-  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -12,6 +14,7 @@ concurrency:
 
 jobs:
   validate:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -77,34 +80,3 @@ jobs:
           print(f'Validated {len(pages)} pages and {len(documents)} data files')
           PY
 
-  pages:
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verify the GitHub Pages run at the same commit
-        env:
-          GH_TOKEN: ${{ secrets.GH_MIRROR_TOKEN }}
-          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          api="https://api.github.com/repos/nelsong6/street-fighter-reference/actions/workflows/pages.yml/runs?event=push&head_sha=$SHA&per_page=10" # internet: Verify GitHub Pages deployment
-          start=$(date +%s)
-          while :; do
-            result=$(curl -fsS --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "$api")
-            count=$(jq '.total_count' <<<"$result")
-            if [ "$count" -gt 0 ]; then
-              status=$(jq -r '.workflow_runs[0].status' <<<"$result")
-              conclusion=$(jq -r '.workflow_runs[0].conclusion' <<<"$result")
-              url=$(jq -r '.workflow_runs[0].html_url' <<<"$result")
-              echo "Pages run $url: $status $conclusion"
-              if [ "$status" = completed ]; then
-                [ "$conclusion" = success ] && exit 0
-                echo "::error::GitHub Pages failed at $SHA: $url"
-                exit 1
-              fi
-            fi
-            if [ "$(( $(date +%s) - start ))" -ge 900 ]; then
-              echo "::error::No successful GitHub Pages push run at $SHA after 15 minutes"
-              exit 1
-            fi
-            sleep 20
-          done
